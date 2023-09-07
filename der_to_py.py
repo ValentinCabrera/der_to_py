@@ -115,11 +115,19 @@ class Entidad():
 
         return relaciones
 
-file_name = "DER-Reservas.mdj"
+file_name = "ModeloER.mdj"
 f = open(file_name, 'r')
 
 dic = json.load(f)
-datos = dic["ownedElements"][1]["ownedElements"]
+
+datos = {}
+
+for i in dic["ownedElements"]:
+    if i["_type"] == "ERDDataModel":
+        datos = i
+        break
+
+datos = datos ["ownedElements"]
 
 der = datos[0]["ownedViews"]
 entidades_totales = datos[1:]
