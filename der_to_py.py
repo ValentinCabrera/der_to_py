@@ -1,11 +1,113 @@
 import json
 
+def get_entidad(dic):
+    entidad = {"id":dic["_id"], "nombre":dic["name"]}
+
+    try:
+        dato = dic["columns"]
+        atributos = []
+
+        for i in dato:
+            try:
+                atributo = {"nombre":i["name"], "tipo":i["type"]}
+
+                try:
+                    atributo["primaryKey"] = i["primaryKey"]
+
+                except:
+                    pass
+
+                try:
+                    i["foreignKey"]
+
+                except:
+                    atributos.append(atributo)
+
+            except:
+                pass
+        
+        else:
+            entidad["atributos"] = atributos
+        
+    except:
+        pass
+
+    try:
+        dato = dic["ownedElements"]
+        relaciones = []
+
+        for i in dato:
+            if i["_id"] in modelos:
+                destino = i["end2"]["reference"]["$ref"]
+                cardinalidad = "1..1"
+
+                try:
+                    cardinalidad = i["end2"]["cardinality"]
+
+                except:
+                    pass
+
+                relaciones.append({"destino":destino, "cardinalidad":cardinalidad})
+
+        else:
+            if relaciones != []:
+                entidad["relaciones"] = relaciones
+
+    except:
+        pass
+
+    return entidad
+
+def verificar_orden(entidades):
+    for i in range(len(entidades)):
+        for k in entidades[i:]:
+            if k.id in entidades[i].get_relaciones():
+                return False
+            
+    return True
+
+def ordenamiento_topologico(desordenadas):
+
+    ordenadas = []
+
+    for i in desordenadas:
+        if i.relaciones == {}:
+            ordenadas.append(i)
+            desordenadas.remove(i)
+
+    dependientes = []
+
+
+    for i in desordenadas:
+        for j in dependientes:
+            if i.id in j.get_relaciones():
+                posicion = dependientes.index(j)
+                dependientes = dependientes[:posicion] + [i] + dependientes[posicion:] 
+
+                break
+        else:
+            dependientes.append(i)
+
+    ordenadas = ordenadas + dependientes
+
+
+    if not verificar_orden(ordenadas):
+        return ordenamiento_topologico(ordenadas)
+
+    return ordenadas
+
 class Entidad():
     def __init__(self, **kwargs):
         self.id = kwargs.get("id")
         self.nombre = kwargs.get("nombre")
         self.atributos = kwargs.get("atributos", {})
-        self.relaciones = kwargs.get("relaciones", {})
+        self.relaciones_destino = kwargs.get("relaciones", {})
+        self.relaciones = []
+
+    def set_relaciones(self):
+        for i in self.relaciones_destino:
+            entidad = list(filter(lambda entidad: entidad.id == i["destino"], entidades))[0]
+            entidad.relaciones.append({"destino":self.id, "cardinalidad":i["cardinalidad"]})
 
     def get_django_atributo(self, atributo):
         tipo = ""
@@ -115,7 +217,7 @@ class Entidad():
 
         return relaciones
 
-file_name = "ModeloER.mdj"
+file_name = "DER-Reservas.mdj"
 f = open(file_name, 'r')
 
 dic = json.load(f)
@@ -137,108 +239,13 @@ modelos = []
 for i in der:
     modelos.append(i["model"]['$ref'])
 
-def get_entidad(dic):
-    entidad = {"id":dic["_id"], "nombre":dic["name"]}
-
-    try:
-        dato = dic["columns"]
-        atributos = []
-
-        for i in dato:
-            try:
-                atributo = {"nombre":i["name"], "tipo":i["type"]}
-
-                try:
-                    atributo["primaryKey"] = i["primaryKey"]
-
-                except:
-                    pass
-
-                try:
-                    i["foreignKey"]
-
-                except:
-                    atributos.append(atributo)
-
-            except:
-                pass
-        
-        else:
-            entidad["atributos"] = atributos
-        
-    except:
-        pass
-
-    try:
-        dato = dic["ownedElements"]
-        relaciones = []
-
-        for i in dato:
-            if i["_id"] in modelos:
-                destino = i["end2"]["reference"]["$ref"]
-                cardinalidad = "1..1"
-
-                try:
-                    cardinalidad = i["end2"]["cardinality"]
-
-                except:
-                    pass
-
-                relaciones.append({"destino":destino, "cardinalidad":cardinalidad})
-
-        else:
-            if relaciones != []:
-                entidad["relaciones"] = relaciones
-
-    except:
-        pass
-
-    return entidad
-
 entidades = []
 
 for i in entidades_totales:
     if i["_id"] in modelos:
         entidades.append(Entidad(**get_entidad(i)))
 
-def verificar_orden(entidades):
-    for i in range(len(entidades)):
-        for k in entidades[i:]:
-            if k.id in entidades[i].get_relaciones():
-                return False
-            
-    return True
-
-
-def ordenamiento_topologico(desordenadas):
-
-    ordenadas = []
-
-    for i in desordenadas:
-        if i.relaciones == {}:
-            ordenadas.append(i)
-            desordenadas.remove(i)
-
-    dependientes = []
-
-
-    for i in desordenadas:
-        for j in dependientes:
-            if i.id in j.get_relaciones():
-                posicion = dependientes.index(j)
-                dependientes = dependientes[:posicion] + [i] + dependientes[posicion:] 
-
-                break
-        else:
-            dependientes.append(i)
-
-    ordenadas = ordenadas + dependientes
-
-
-    if not verificar_orden(ordenadas):
-        return ordenamiento_topologico(ordenadas)
-
-    return ordenadas
+[entidad.set_relaciones() for entidad in entidades]
 
 entidades = ordenamiento_topologico(entidades)
 
